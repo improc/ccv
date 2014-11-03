@@ -1,10 +1,10 @@
-#include "ccv.h"
-#include "ccv_internal.h"
 #if defined(HAVE_SSE2)
 #include <xmmintrin.h>
 #elif defined(HAVE_NEON)
 #include <arm_neon.h>
 #endif
+#include "ccv.h"
+#include "ccv_internal.h"
 #ifdef HAVE_GSL
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
@@ -17,6 +17,8 @@
 #endif
 #include "3rdparty/sqlite3/sqlite3.h"
 #include "inl/ccv_convnet_inl.h"
+
+#include <stdio.h>
 
 #ifndef CASE_TESTS
 
@@ -1390,6 +1392,129 @@ void ccv_convnet_compact(ccv_convnet_t* convnet)
 	}
 }
 
+
+void ccv_convnet_write_file(ccv_convnet_t* convnet, const char* filename, ccv_convnet_write_param_t params)
+{
+    FILE* myfile = fopen(filename, "w+");
+
+    fprintf(myfile, "ccv_model_from_text 1 ");
+    fprintf(myfile, "%d %d %d ", convnet->count, convnet->input.height, convnet->input.width);
+    
+    int i = 0;
+    int j = 0;
+    for (i = 0; i < convnet->count; i++)
+    {
+        ccv_convnet_layer_t* layer = convnet->layers + i;
+        fprintf(myfile, "%d %d %d %d %d %d %d ",
+            i,
+            layer->type,
+            layer->input.matrix.rows,
+            layer->input.matrix.cols,
+            layer->input.matrix.channels,
+            layer->input.matrix.partition,
+            layer->input.node.count);
+
+        switch (layer->type)
+        {
+        case CCV_CONVNET_CONVOLUTIONAL:
+            fprintf(myfile, "%d %d %d %d %d %d %d ",
+                layer->net.convolutional.rows,
+                layer->net.convolutional.cols,
+                layer->net.convolutional.channels,
+                layer->net.convolutional.partition,
+                layer->net.convolutional.count,
+                layer->net.convolutional.strides,
+                layer->net.convolutional.border);
+            break;
+        case CCV_CONVNET_FULL_CONNECT:
+            fprintf(myfile, "%d %d ",
+                layer->net.full_connect.count,
+                layer->net.full_connect.relu);
+            break;
+        case CCV_CONVNET_MAX_POOL:
+        case CCV_CONVNET_AVERAGE_POOL:
+            fprintf(myfile, "%d %d %d ",
+                layer->net.pool.strides,
+                layer->net.pool.border,
+                layer->net.pool.size);
+            break;
+        case CCV_CONVNET_LOCAL_RESPONSE_NORM:
+            fprintf(myfile, "%d %f %f %f ",
+                layer->net.rnorm.size,
+                layer->net.rnorm.kappa,
+                layer->net.rnorm.alpha,
+                layer->net.rnorm.beta);
+            break;
+        }
+    }
+
+    fprintf(myfile, "%d ", params.half_precision);
+    
+    for (i = 0; i < convnet->count; i++)
+    {
+        ccv_convnet_layer_t* layer = convnet->layers + i;
+        if (layer->type == CCV_CONVNET_CONVOLUTIONAL || layer->type == CCV_CONVNET_FULL_CONNECT)
+        {
+            if (params.half_precision)
+            {
+                uint16_t* w = (uint16_t*)ccmalloc(sizeof(uint16_t) * layer->wnum);
+                ccv_float_to_half_precision(layer->w, w, layer->wnum);
+                uint16_t* bias = (uint16_t*)ccmalloc(sizeof(uint16_t) * (layer->type == CCV_CONVNET_CONVOLUTIONAL ? layer->net.convolutional.count : layer->net.full_connect.count));
+                ccv_float_to_half_precision(layer->bias, bias, layer->type == CCV_CONVNET_CONVOLUTIONAL ? layer->net.convolutional.count : layer->net.full_connect.count);
+
+                fprintf(myfile, "%d ", layer->wnum);
+                for (j = 0; j < layer->wnum; j++)
+                {
+                    fprintf(myfile, "%d ", w[j]);
+                }
+                fprintf(myfile, "\n");
+
+                //printf("saving wnum: %d \n", layer->wnum);
+
+                int cntBias = (layer->type == CCV_CONVNET_CONVOLUTIONAL ? layer->net.convolutional.count : layer->net.full_connect.count);
+                fprintf(myfile, "%d ", cntBias);
+                for (j = 0; j < cntBias; j++)
+                {
+                    fprintf(myfile, "%d ", bias[j]);
+                }
+                fprintf(myfile, "\n");
+
+                ccfree(w);
+                w = NULL;
+
+                ccfree(bias);
+                bias = NULL;
+
+                //printf("saving cntBias: %d \n", cntBias);
+
+            } else {
+                int j = 0;
+                fprintf(myfile, "%d ", layer->wnum);
+                for (j = 0; j < layer->wnum; j++)
+                {
+                    fprintf(myfile, "%f ", layer->w[j]);
+                }
+
+                int cntBias = (layer->type == CCV_CONVNET_CONVOLUTIONAL ? layer->net.convolutional.count : layer->net.full_connect.count);
+                fprintf(myfile, "%d ", cntBias);
+                for (j = 0; j < cntBias; j++)
+                {
+                    fprintf(myfile, "%f ", layer->bias[j]);
+                }
+            }
+        }
+    }
+    int cntW = convnet->input.height * convnet->input.width * convnet->channels;
+    fprintf(myfile, "%d ", cntW);
+    for (j = 0; j < cntW; j++)
+    {
+        fprintf(myfile, "%f ", *(convnet->mean_activity->data.f32 + j));
+    }
+    //printf("saving cntW: %d \n", cntW);
+    
+    fclose(myfile);
+}
+
 void ccv_convnet_write(ccv_convnet_t* convnet, const char* filename, ccv_convnet_write_param_t params)
 {
 	sqlite3* db = 0;
@@ -1510,6 +1635,262 @@ void ccv_convnet_write(ccv_convnet_t* convnet, const char* filename, ccv_convnet
 		sqlite3_finalize(convnet_params_insert_stmt);
 		sqlite3_close(db);
 	}
+}
+
+ccv_convnet_t* ccv_convnet_read_buffer(int use_cwc_accel, char* buffer)
+{
+    int j, i, offset;
+    ccv_convnet_t* convnet = 0;
+    int convnet_layers_count = 0;
+    if (buffer != NULL)
+    {
+        char header[180];
+        int version;
+        if (sscanf(buffer, "%s %d %n", header, &version,  &offset) != 2)
+        {
+            return NULL;
+        }
+        if (strcmp(header, "ccv_model_from_text") != 0)
+        {
+            return NULL;
+        }
+        buffer += offset;
+        //printf("header version: %d\n", version);
+
+        ccv_size_t input = ccv_size(0, 0);
+        if (sscanf(buffer, "%d %d %d %n", &convnet_layers_count, &(input.height), &(input.width),  &offset) != 3)
+        {
+            printf("problem loading\n");
+        }
+        buffer += offset;
+
+        //printf("count: %d (%dx%d)\n", convnet_layers_count, input.height, input.width);
+
+        ccv_array_t* layer_params = ccv_array_new(sizeof(ccv_convnet_layer_param_t), 3, 0);
+        int dummy;
+        for (i = 0; i < convnet_layers_count; i++)
+        {
+            //printf("new layer\n");
+            ccv_convnet_layer_param_t layer_param;
+            sscanf(buffer, "%d %d %d %d %d %d %d %n",
+                &dummy,
+                &(layer_param.type),
+                &(layer_param.input.matrix.rows),
+                &(layer_param.input.matrix.cols),
+                &(layer_param.input.matrix.channels),
+                &(layer_param.input.matrix.partition),
+                &(layer_param.input.node.count), 
+                &offset);
+            buffer += offset;
+            layer_param.bias = layer_param.glorot = 0; // this is irrelevant to read convnet
+
+            //printf("lp: %d %d %d\n", (layer_param.type), (layer_param.input.matrix.rows), (layer_param.input.matrix.cols));
+
+            switch (layer_param.type)
+            {
+            case CCV_CONVNET_CONVOLUTIONAL:
+                sscanf(buffer, "%d %d %d %d %d %d %d %n",
+                    &(layer_param.output.convolutional.rows),
+                    &(layer_param.output.convolutional.cols),
+                    &(layer_param.output.convolutional.channels),
+                    &(layer_param.output.convolutional.partition),
+                    &(layer_param.output.convolutional.count),
+                    &(layer_param.output.convolutional.strides),
+                    &(layer_param.output.convolutional.border),  
+                    &offset);
+                buffer += offset;
+                break;
+            case CCV_CONVNET_FULL_CONNECT:
+                sscanf(buffer, "%d %d %n",
+                    &(layer_param.output.full_connect.count),
+                    &(layer_param.output.full_connect.relu),  
+                    &offset);
+                buffer += offset;
+                break;
+            case CCV_CONVNET_MAX_POOL:
+            case CCV_CONVNET_AVERAGE_POOL:
+                sscanf(buffer, "%d %d %d %n",
+                    &(layer_param.output.pool.strides),
+                    &(layer_param.output.pool.border),
+                    &(layer_param.output.pool.size),  
+                    &offset);
+                buffer += offset;
+                break;
+            case CCV_CONVNET_LOCAL_RESPONSE_NORM:
+                sscanf(buffer, "%d %f %f %f %n",
+                    &(layer_param.output.rnorm.size),
+                    &(layer_param.output.rnorm.kappa),
+                    &(layer_param.output.rnorm.alpha),
+                    &(layer_param.output.rnorm.beta),  
+                    &offset);
+                buffer += offset;
+                break;
+            }
+            ccv_array_push(layer_params, &layer_param);
+        }
+
+
+        assert(input.height != 0 && input.width != 0);
+        convnet = ccv_convnet_new(use_cwc_accel, input, (ccv_convnet_layer_param_t*)ccv_array_get(layer_params, 0), layer_params->rnum);
+        ccv_array_free(layer_params);
+
+        int half_precision = 0;
+        sscanf(buffer, "%d %n", &half_precision, &offset);
+        buffer += offset;
+
+        for (i = 0; i < convnet->count; i++)
+        {
+            ccv_convnet_layer_t* layer = convnet->layers + i;
+            if (layer->type == CCV_CONVNET_CONVOLUTIONAL || layer->type == CCV_CONVNET_FULL_CONNECT)
+            {
+                int wnum = 0;
+                sscanf(buffer, "%d %n", &wnum, &offset);
+                buffer += offset;
+                //printf("wnum: %d wnumExpected: %d\n", wnum, layer->wnum);
+
+                uint16_t* d = (uint16_t*)ccmalloc(sizeof(uint16_t) * wnum);
+                float* f = (float*)ccmalloc(sizeof(float) * wnum);
+
+                for (j = 0; j < wnum; j++)
+                {
+                    if (half_precision)
+                    {
+                        d[j] = strtol (buffer, &buffer, 10);
+                        //sscanf(buffer, "%hu %n", &d[j], &offset);
+                        //buffer += offset;
+                    }
+                    else
+                    {
+                        f[j] = strtol (buffer, &buffer, 10);
+                        //sscanf(buffer, "%f %n", &f[j], &offset);
+                        //buffer += offset;
+                    }
+                }
+
+                if (half_precision)
+                {
+                    ccv_half_precision_to_float((uint16_t*)d, f, wnum);
+                }
+                
+                for (j = 0; j < wnum; j++)
+                {
+                    layer->w[j] = f[j];
+                }
+
+                ccfree(d);
+                d = NULL;
+
+                ccfree(f);
+                f = NULL;
+
+                // biases
+                int biases = 0;
+                sscanf(buffer, "%d %n", &biases, &offset);
+                buffer += offset;
+                int biasesExpected =  (layer->type == CCV_CONVNET_CONVOLUTIONAL ? layer->net.convolutional.count : layer->net.full_connect.count);
+
+                //printf("biases: %d, biases expected %d\n", biases, biasesExpected);
+
+                //if (biases == (layer->type == CCV_CONVNET_CONVOLUTIONAL ? layer->net.convolutional.count : layer->net.full_connect.count))
+                //{
+                uint16_t* dB = (uint16_t*)ccmalloc(sizeof(uint16_t) * biases);
+                float* fB = (float*)ccmalloc(sizeof(float) * biases);
+
+                for (j = 0; j < biases; j++)
+                {
+                    if (half_precision)
+                    {
+                        dB[j] = strtol (buffer, &buffer, 10);
+                        //sscanf(buffer, "%hu %n", &dB[j], &offset);
+                        //buffer += offset;
+                    }
+                    else
+                    {
+                        fB[j] = strtol (buffer, &buffer, 10);
+                        //sscanf(buffer, "%f %n", &fB[j], &offset);
+                        //buffer += offset;
+                    }
+                }
+
+                if (half_precision)
+                {
+                    ccv_half_precision_to_float((uint16_t*)dB, fB, biases);
+                }
+
+                for (j = 0; j < biases; j++)
+                {
+                    layer->bias[j] = fB[j];
+                }
+
+                ccfree(dB);
+                dB = NULL;
+
+                ccfree(fB);
+                fB = NULL;
+            }
+        }
+
+
+        // weights
+        int weights = 0;
+        sscanf(buffer, "%d %n", &weights, &offset);
+        buffer += offset;
+
+        float* fWeights = (float*)ccmalloc(sizeof(float) * weights);
+
+        for (j = 0; j < weights; j++)
+        {
+            // strtod does not working!!!!
+            //fWeights[j] = (float) strtod (buffer, &buffer);
+            sscanf(buffer, "%f %n", &fWeights[j], &offset);
+            buffer += offset;
+        }
+
+        for (j = 0; j < weights; j++)
+        {
+            *(convnet->mean_activity->data.f32 + j) = fWeights[j];
+        }
+
+        ccfree(fWeights);
+        fWeights = NULL;
+    }
+    return convnet;
+}
+
+ccv_convnet_t* ccv_convnet_read_file(int use_cwc_accel, const char* filename)
+{
+    long lSize;
+    char *buffer;
+
+    FILE* myfile = fopen(filename, "r+");
+    if (myfile == NULL)
+    {
+        printf("problem loading file");
+        return NULL;
+    }
+
+    //printf("model file loaded\n");
+
+    fseek( myfile , 0L , SEEK_END);
+    lSize = ftell( myfile );
+    rewind( myfile );
+
+    buffer = calloc( 1, lSize+1 );
+    if (buffer == NULL)
+    {
+        printf("problem allocating buffer");
+        fclose(myfile);
+        return NULL;
+    }
+
+    int readed = fread( buffer , lSize ,1, myfile);
+
+    ccv_convnet_t* model = ccv_convnet_read_buffer(use_cwc_accel, buffer);
+
+    fclose(myfile);
+    free(buffer);
+
+    return model;
 }
 
 ccv_convnet_t* ccv_convnet_read(int use_cwc_accel, const char* filename)

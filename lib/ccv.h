@@ -6,7 +6,12 @@
 #ifndef GUARD_ccv_h
 #define GUARD_ccv_h
 
+#define __attribute__(A) /* do nothing */
+#ifdef LINUX
 #include <unistd.h>
+#else
+#include <io.h>
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,7 +20,16 @@
 #include <float.h>
 #include <math.h>
 #include <assert.h>
+#include <stdio.h>
+#include <stdint.h>
+
+#ifdef LINUX
+#include <stdio.h>
+#include <stdint.h>
 #include <alloca.h>
+#else
+#include <malloc.h>
+#endif
 
 #define CCV_PI (3.141592653589793)
 #define ccmalloc malloc
@@ -1305,7 +1319,10 @@ void ccv_convnet_encode(ccv_convnet_t* convnet, ccv_dense_matrix_t** a, ccv_dens
 void ccv_convnet_input_formation(ccv_convnet_t* convnet, ccv_dense_matrix_t* a, ccv_dense_matrix_t** b);
 void ccv_convnet_classify(ccv_convnet_t* convnet, ccv_dense_matrix_t** a, int symmetric, ccv_array_t** ranks, int tops, int batch);
 ccv_convnet_t* __attribute__((warn_unused_result)) ccv_convnet_read(int use_cwc_accel, const char* filename);
+ccv_convnet_t* __attribute__((warn_unused_result)) ccv_convnet_read_file(int use_cwc_accel, const char* filename);
+ccv_convnet_t* __attribute__((warn_unused_result)) ccv_convnet_read_buffer(int use_cwc_accel, char* buffer);
 void ccv_convnet_write(ccv_convnet_t* convnet, const char* filename, ccv_convnet_write_param_t params);
+void ccv_convnet_write_file(ccv_convnet_t* convnet, const char* filename, ccv_convnet_write_param_t params);
 void ccv_convnet_compact(ccv_convnet_t* convnet); // remove unused resources
 void ccv_convnet_free(ccv_convnet_t* convnet);
 

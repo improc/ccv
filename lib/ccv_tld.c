@@ -1,7 +1,7 @@
-#include "ccv.h"
-#include "ccv_internal.h"
 #include "3rdparty/sfmt/SFMT.h"
 #include "3rdparty/dsfmt/dSFMT.h"
+#include "ccv.h"
+#include "ccv_internal.h"
 
 const ccv_tld_param_t ccv_tld_default_params = {
 	.win_size = {

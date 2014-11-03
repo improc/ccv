@@ -8,7 +8,14 @@
 
 /* this is only to get definitions for memcpy(), ntohl() and htonl() */
 #include <string.h>
+#ifdef LINUX
 #include <arpa/inet.h>
+#else
+#include <Winsock2.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdint.h>
+#endif
 
 #include "sha1.h"
 

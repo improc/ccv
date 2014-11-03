@@ -1,6 +1,6 @@
+#include "3rdparty/dsfmt/dSFMT.h"
 #include "ccv.h"
 #include "ccv_internal.h"
-#include "3rdparty/dsfmt/dSFMT.h"
 
 ccv_ferns_t* ccv_ferns_new(int structs, int features, int scales, ccv_size_t* sizes)
 {

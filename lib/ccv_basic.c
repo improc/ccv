@@ -1,10 +1,14 @@
-#include "ccv.h"
-#include "ccv_internal.h"
+#if defined(LINUX)
+
 #if defined(HAVE_SSE2)
 #include <xmmintrin.h>
 #elif defined(HAVE_NEON)
 #include <arm_neon.h>
 #endif
+#endif
+
+#include "ccv.h"
+#include "ccv_internal.h"
 
 /* sobel filter is fundamental to many other high-level algorithms,
  * here includes 2 special case impl (for 1x3/3x1, 3x3) and one general impl */
