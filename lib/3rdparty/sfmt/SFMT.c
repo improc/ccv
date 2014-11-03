@@ -338,7 +338,7 @@ void sfmt_fill_array64(sfmt_t * sfmt, uint64_t *array, int size) {
  * @param size the size of the array
  * @param rsize the size of each record in the array
  */
-#ifdef LINUX
+#ifndef WIN_GCC
 #include <alloca.h>
 #else
 #include <malloc.h>

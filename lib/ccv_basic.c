@@ -1,5 +1,4 @@
-#if defined(LINUX)
-
+#ifndef WIN_GCC
 #if defined(HAVE_SSE2)
 #include <xmmintrin.h>
 #elif defined(HAVE_NEON)

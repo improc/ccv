@@ -10,7 +10,7 @@
 #endif
 #endif
 
-#ifndef LINUX 
+#ifdef WIN_GCC 
 #define __thread 
 #endif
 

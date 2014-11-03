@@ -8,7 +8,7 @@
 
 /* this is only to get definitions for memcpy(), ntohl() and htonl() */
 #include <string.h>
-#ifdef LINUX
+#ifndef WIN_GCC
 #include <arpa/inet.h>
 #else
 #include <Winsock2.h>

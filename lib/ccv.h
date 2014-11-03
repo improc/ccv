@@ -7,7 +7,7 @@
 #define GUARD_ccv_h
 
 #define __attribute__(A) /* do nothing */
-#ifdef LINUX
+#ifndef WIN_GCC
 #include <unistd.h>
 #else
 #include <io.h>
@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#ifdef LINUX
+#ifndef WIN_GCC
 #include <stdio.h>
 #include <stdint.h>
 #include <alloca.h>
