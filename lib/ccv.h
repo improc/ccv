@@ -7,6 +7,7 @@
 #define GUARD_ccv_h
 
 #define __attribute__(A) /* do nothing */
+
 #ifndef WIN_GCC
 #include <unistd.h>
 #else
