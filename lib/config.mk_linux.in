@@ -1,0 +1,9 @@
+CC := gcc
+AR := ar
+NVCC := nvcc
+CUDA_OBJS := 
+CBLAS_PATH := "./../../cblas"
+DEFINE_MACROS := -D HAVE_CBLAS 
+CFLAGS := $(DEFINE_MACROS) 
+NVFLAGS := --use_fast_math -arch=sm_30 $(DEFINE_MACROS)
+LDFLAGS := -lm  -lgslcblas
