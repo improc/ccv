@@ -3,7 +3,7 @@ AR := ar
 NVCC := nvcc
 CUDA_OBJS := 
 CBLAS_PATH := "./../../cblas"
-DEFINE_MACROS := -D HAVE_CBLAS -D snprintf=_snprintf -D WIN_GCC
+DEFINE_MACROS := -D HAVE_CBLAS -D snprintf=_snprintf -D _WINDOWS
 CFLAGS := $(DEFINE_MACROS) 
 NVFLAGS := --use_fast_math -arch=sm_30 $(DEFINE_MACROS)
 LDFLAGS := -lm  -lgslcblas

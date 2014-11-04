@@ -8,7 +8,7 @@
 
 #define __attribute__(A) /* do nothing */
 
-#ifndef WIN_GCC
+#ifndef _WINDOWS
 #include <unistd.h>
 #else
 #include <io.h>
@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#ifndef WIN_GCC
+#ifndef _WINDOWS
 #include <stdio.h>
 #include <stdint.h>
 #include <alloca.h>

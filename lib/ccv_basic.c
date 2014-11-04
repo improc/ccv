@@ -1,4 +1,4 @@
-#ifndef WIN_GCC
+#ifndef _WINDOWS
 #if defined(HAVE_SSE2)
 #include <xmmintrin.h>
 #elif defined(HAVE_NEON)
