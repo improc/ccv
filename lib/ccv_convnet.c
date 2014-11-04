@@ -1469,8 +1469,6 @@ void ccv_convnet_write_file(ccv_convnet_t* convnet, const char* filename, ccv_co
                 }
                 fprintf(myfile, "\n");
 
-                //printf("saving wnum: %d \n", layer->wnum);
-
                 int cntBias = (layer->type == CCV_CONVNET_CONVOLUTIONAL ? layer->net.convolutional.count : layer->net.full_connect.count);
                 fprintf(myfile, "%d ", cntBias);
                 for (j = 0; j < cntBias; j++)
@@ -1484,8 +1482,6 @@ void ccv_convnet_write_file(ccv_convnet_t* convnet, const char* filename, ccv_co
 
                 ccfree(bias);
                 bias = NULL;
-
-                //printf("saving cntBias: %d \n", cntBias);
 
             } else {
                 int j = 0;
@@ -1510,7 +1506,6 @@ void ccv_convnet_write_file(ccv_convnet_t* convnet, const char* filename, ccv_co
     {
         fprintf(myfile, "%f ", *(convnet->mean_activity->data.f32 + j));
     }
-    //printf("saving cntW: %d \n", cntW);
     
     fclose(myfile);
 }
@@ -1644,8 +1639,8 @@ ccv_convnet_t* ccv_convnet_read_buffer(int use_cwc_accel, char* buffer)
     int convnet_layers_count = 0;
     if (buffer != NULL)
     {
-        char header[180];
-        int version;
+        char header[200];
+        int version;    // not handled now
         if (sscanf(buffer, "%s %d %n", header, &version,  &offset) != 2)
         {
             return NULL;
@@ -1655,25 +1650,20 @@ ccv_convnet_t* ccv_convnet_read_buffer(int use_cwc_accel, char* buffer)
             return NULL;
         }
         buffer += offset;
-        //printf("header version: %d\n", version);
 
         ccv_size_t input = ccv_size(0, 0);
         if (sscanf(buffer, "%d %d %d %n", &convnet_layers_count, &(input.height), &(input.width),  &offset) != 3)
         {
-            printf("problem loading\n");
+            PRINT(CCV_CLI_ERROR, "problem loading");
+            return NULL;
         }
         buffer += offset;
 
-        //printf("count: %d (%dx%d)\n", convnet_layers_count, input.height, input.width);
-
         ccv_array_t* layer_params = ccv_array_new(sizeof(ccv_convnet_layer_param_t), 3, 0);
-        int dummy;
         for (i = 0; i < convnet_layers_count; i++)
         {
-            //printf("new layer\n");
             ccv_convnet_layer_param_t layer_param;
-            sscanf(buffer, "%d %d %d %d %d %d %d %n",
-                &dummy,
+            sscanf(buffer, "%*d %d %d %d %d %d %d %n",
                 &(layer_param.type),
                 &(layer_param.input.matrix.rows),
                 &(layer_param.input.matrix.cols),
@@ -1682,9 +1672,7 @@ ccv_convnet_t* ccv_convnet_read_buffer(int use_cwc_accel, char* buffer)
                 &(layer_param.input.node.count), 
                 &offset);
             buffer += offset;
-            layer_param.bias = layer_param.glorot = 0; // this is irrelevant to read convnet
-
-            //printf("lp: %d %d %d\n", (layer_param.type), (layer_param.input.matrix.rows), (layer_param.input.matrix.cols));
+            layer_param.bias = layer_param.glorot = 0; // this is irrelevant to read 
 
             switch (layer_param.type)
             {
@@ -1729,7 +1717,6 @@ ccv_convnet_t* ccv_convnet_read_buffer(int use_cwc_accel, char* buffer)
             ccv_array_push(layer_params, &layer_param);
         }
 
-
         assert(input.height != 0 && input.width != 0);
         convnet = ccv_convnet_new(use_cwc_accel, input, (ccv_convnet_layer_param_t*)ccv_array_get(layer_params, 0), layer_params->rnum);
         ccv_array_free(layer_params);
@@ -1746,7 +1733,6 @@ ccv_convnet_t* ccv_convnet_read_buffer(int use_cwc_accel, char* buffer)
                 int wnum = 0;
                 sscanf(buffer, "%d %n", &wnum, &offset);
                 buffer += offset;
-                //printf("wnum: %d wnumExpected: %d\n", wnum, layer->wnum);
 
                 uint16_t* d = (uint16_t*)ccmalloc(sizeof(uint16_t) * wnum);
                 float* f = (float*)ccmalloc(sizeof(float) * wnum);
@@ -1756,14 +1742,10 @@ ccv_convnet_t* ccv_convnet_read_buffer(int use_cwc_accel, char* buffer)
                     if (half_precision)
                     {
                         d[j] = strtol (buffer, &buffer, 10);
-                        //sscanf(buffer, "%hu %n", &d[j], &offset);
-                        //buffer += offset;
                     }
                     else
                     {
                         f[j] = strtol (buffer, &buffer, 10);
-                        //sscanf(buffer, "%f %n", &f[j], &offset);
-                        //buffer += offset;
                     }
                 }
 
@@ -1787,12 +1769,7 @@ ccv_convnet_t* ccv_convnet_read_buffer(int use_cwc_accel, char* buffer)
                 int biases = 0;
                 sscanf(buffer, "%d %n", &biases, &offset);
                 buffer += offset;
-                int biasesExpected =  (layer->type == CCV_CONVNET_CONVOLUTIONAL ? layer->net.convolutional.count : layer->net.full_connect.count);
 
-                //printf("biases: %d, biases expected %d\n", biases, biasesExpected);
-
-                //if (biases == (layer->type == CCV_CONVNET_CONVOLUTIONAL ? layer->net.convolutional.count : layer->net.full_connect.count))
-                //{
                 uint16_t* dB = (uint16_t*)ccmalloc(sizeof(uint16_t) * biases);
                 float* fB = (float*)ccmalloc(sizeof(float) * biases);
 
@@ -1801,14 +1778,10 @@ ccv_convnet_t* ccv_convnet_read_buffer(int use_cwc_accel, char* buffer)
                     if (half_precision)
                     {
                         dB[j] = strtol (buffer, &buffer, 10);
-                        //sscanf(buffer, "%hu %n", &dB[j], &offset);
-                        //buffer += offset;
                     }
                     else
                     {
                         fB[j] = strtol (buffer, &buffer, 10);
-                        //sscanf(buffer, "%f %n", &fB[j], &offset);
-                        //buffer += offset;
                     }
                 }
 
@@ -1830,7 +1803,6 @@ ccv_convnet_t* ccv_convnet_read_buffer(int use_cwc_accel, char* buffer)
             }
         }
 
-
         // weights
         int weights = 0;
         sscanf(buffer, "%d %n", &weights, &offset);
@@ -1840,8 +1812,6 @@ ccv_convnet_t* ccv_convnet_read_buffer(int use_cwc_accel, char* buffer)
 
         for (j = 0; j < weights; j++)
         {
-            // strtod does not working!!!!
-            //fWeights[j] = (float) strtod (buffer, &buffer);
             sscanf(buffer, "%f %n", &fWeights[j], &offset);
             buffer += offset;
         }
@@ -1865,11 +1835,9 @@ ccv_convnet_t* ccv_convnet_read_file(int use_cwc_accel, const char* filename)
     FILE* myfile = fopen(filename, "r+");
     if (myfile == NULL)
     {
-        printf("problem loading file");
+        PRINT(CCV_CLI_ERROR, "problem loading file");
         return NULL;
     }
-
-    //printf("model file loaded\n");
 
     fseek( myfile , 0L , SEEK_END);
     lSize = ftell( myfile );
@@ -1878,7 +1846,7 @@ ccv_convnet_t* ccv_convnet_read_file(int use_cwc_accel, const char* filename)
     buffer = calloc( 1, lSize+1 );
     if (buffer == NULL)
     {
-        printf("problem allocating buffer");
+        PRINT(CCV_CLI_ERROR, "problem allocating buffer");
         fclose(myfile);
         return NULL;
     }
