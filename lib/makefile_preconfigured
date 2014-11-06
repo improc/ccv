@@ -1,4 +1,4 @@
-include config.mk_mingw.in
+include config.mk
 
 CFLAGS := $(CFLAGS) -ffast-math -Wall -O3 -mstackrealign -lm -D HAVE_SSE2 -D __SSE2__ -D __MMX__ -msse -msse2 -I $(CBLAS_PATH)
 NVFLAGS := -O3 $(NVFLAGS)
