@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <CBLAS_PATH>$(SolutionDir)\..\..\..\cblas</CBLAS_PATH>
+    <MINGW_LIBS_PATH>$(SolutionDir)\..\..\..\mingw_libs</MINGW_LIBS_PATH>
+    <GTEST_PATH>$(SolutionDir)\..\..\..\gtest</GTEST_PATH>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemDefinitionGroup />
+  <ItemGroup>
+    <BuildMacro Include="CBLAS_PATH">
+      <Value>$(CBLAS_PATH)</Value>
+    </BuildMacro>
+    <BuildMacro Include="MINGW_LIBS_PATH">
+      <Value>$(MINGW_LIBS_PATH)</Value>
+    </BuildMacro>
+    <BuildMacro Include="GTEST_PATH">
+      <Value>$(GTEST_PATH)</Value>
+    </BuildMacro>
+  </ItemGroup>
+</Project>
