@@ -98,8 +98,9 @@ int main(int argc, const char* argv[])
         string variableName = defineName;
         std::transform(variableName.begin(), variableName.end(),variableName.begin(), ::tolower);
 
-        os << "#ifndef " << defineName << endl;
-        os << "#define " << defineName << endl;
+        // os << "#ifndef " << defineName << endl;
+        // os << "#define " << defineName << endl;
+        os << "#pragma once " << endl;
 
         os << "#include <string.h>" << endl;
         os << "using namespace std;" << endl << endl;
@@ -114,7 +115,7 @@ int main(int argc, const char* argv[])
         }
         os << "};" << endl;
 
-        os << "#endif // " << defineName << endl;
+        // os << "#endif // " << defineName << endl;
 
         os.close();
     }
